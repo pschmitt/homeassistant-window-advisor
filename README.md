@@ -59,6 +59,12 @@ own previous attributes, so state and `todo` briefly disagreed and the
 sensor flapped off/on within a minute. It also stays *unavailable* until the
 first evaluation after a restart instead of reporting on with stale data.
 
+A room advisor also no longer goes unavailable when one of the two times
+is `unknown` (e.g. the room is too cold and no warmer hour is forecast, so
+opening can't be scheduled). The templates hid the room's "close now" advice
+in that case; now it only goes unavailable when its temperatures or window
+contacts do.
+
 ## Installation
 
 HACS (custom repository) or copy `custom_components/window_advisor` into your

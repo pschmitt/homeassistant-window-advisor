@@ -256,12 +256,10 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
         """Per-room advice, None when the room advisor is unavailable."""
         when = (self.data.rooms if self.data else {}).get(room.subentry_id)
         window = self.window_state(room)
-        if (
-            when is None
-            or window in INVALID
-            or when.open.state in INVALID
-            or when.close.state in INVALID
-        ):
+        # A when-to of "unknown" (no useful forecast hour) is a valid answer,
+        # not missing data: the template made the whole room unavailable then,
+        # which hid e.g. "close now" whenever opening couldn't be scheduled.
+        if when is None or window in INVALID:
             return None
         return evaluate_room(window, when.open, when.close)
 

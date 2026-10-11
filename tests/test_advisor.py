@@ -192,3 +192,12 @@ def test_aggregate_todo_next_past_time_is_now() -> None:
 
 def test_relative_datetime_now_is_earlier_today() -> None:
     assert advisor.relative_datetime(NOW.isoformat(), NOW) == "Earlier today, 20:00"
+
+
+def test_room_advice_with_unknown_open_time() -> None:
+    # Too cold, colder outside and no warmer hour ahead: opening can't be
+    # scheduled ("unknown"), but closing is due now.
+    room = advisor.evaluate_room("on", _wt("unknown"), _wt(NOW.isoformat()))
+    assert (room.advice, room.todo, room.problem) == ("close", "close", True)
+    room = advisor.evaluate_room("off", _wt("unknown"), _wt(NOW.isoformat()))
+    assert (room.advice, room.todo, room.problem) == ("close", "nothing", False)

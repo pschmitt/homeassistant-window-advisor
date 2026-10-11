@@ -64,7 +64,7 @@ class RoomAdvisorBinarySensor(WindowAdvisorRoomEntity, BinarySensorEntity):
 
     @property
     def available(self) -> bool:
-        """Unavailable while any input is (same rule as the template)."""
+        """Unavailable while temperatures or window states are."""
         return super().available and self._advice is not None
 
     @property
