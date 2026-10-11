@@ -191,7 +191,8 @@ def relative_datetime(state: str, now: datetime) -> str:
     when = when.astimezone(now.tzinfo)
     hhmm = when.strftime("%H:%M")
     today = now.date()
-    if when < now:
+    # <=: a when-to of "now" is in the past by the time anyone reads it.
+    if when <= now:
         if when.date() == today:
             return f"Earlier today, {hhmm}"
         if when.date() == today - timedelta(days=1):
@@ -372,13 +373,18 @@ def evaluate_aggregate(
             times.append(when)
     if times:
         when = min(times)
-        delta = int((when - now).total_seconds())
+        # Clamped at 0: the template floor-divided negative deltas, so a time
+        # that had just passed showed up as "in 23h59".
+        delta = max(int((when - now).total_seconds()), 0)
         days = delta // 86400
         hours = (delta % 86400) // 3600
         minutes = (delta % 3600) // 60
-        rel = (f"{days}d " if days > 0 else "") + f"{hours}h{minutes:02d}"
         hhmm = when.astimezone(now.tzinfo).strftime("%H:%M")
-        todo_next = f"{opposite.capitalize()} in {rel} ({hhmm})"
+        if delta < 60:
+            todo_next = f"{opposite.capitalize()} now ({hhmm})"
+        else:
+            rel = (f"{days}d " if days > 0 else "") + f"{hours}h{minutes:02d}"
+            todo_next = f"{opposite.capitalize()} in {rel} ({hhmm})"
     else:
         todo_next = f"{opposite.capitalize()}: not anytime soon"
 

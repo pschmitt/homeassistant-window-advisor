@@ -180,3 +180,15 @@ def test_aggregate_ignore_idle_keeps_actionable_rooms() -> None:
         advisor.evaluate_aggregate(rooms, NOW, ignore_idle_rooms=True).todo
         == "Close: Bedroom, Living Room"
     )
+
+
+def test_aggregate_todo_next_past_time_is_now() -> None:
+    # The template rendered this as "Close in 23h59 (19:59)".
+    past = (NOW - timedelta(minutes=1)).isoformat()
+    rooms = [_status("Bedroom", "off", "open", when_close=past)]
+    agg = advisor.evaluate_aggregate(rooms, NOW)
+    assert agg.todo_next == "Close now (19:59)"
+
+
+def test_relative_datetime_now_is_earlier_today() -> None:
+    assert advisor.relative_datetime(NOW.isoformat(), NOW) == "Earlier today, 20:00"
