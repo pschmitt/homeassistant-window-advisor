@@ -19,11 +19,13 @@ from homeassistant.core import (
     callback,
 )
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN, PLATFORMS, SERVICE_REFRESH
 from .coordinator import WindowAdvisorCoordinator
+from .entity import hub_device_info
 from .repairs import async_sync_forecast_issue, async_sync_issues
 
 type WindowAdvisorConfigEntry = ConfigEntry[WindowAdvisorCoordinator]
@@ -52,6 +54,13 @@ async def async_setup_entry(
     """Set up Window Advisor from a config entry."""
     coordinator = WindowAdvisorCoordinator(hass, entry)
     entry.runtime_data = coordinator
+
+    # Register the hub device first: room devices link to it by registry id
+    # (via_device_id; the identifier-based via_device is deprecated).
+    hub = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id, **hub_device_info(coordinator)
+    )
+    coordinator.hub_device_id = hub.id
 
     # Never block startup on the weather service: forward the platforms first
     # and fetch the forecast in the background. Entities stay unavailable
@@ -87,6 +96,10 @@ async def async_setup_entry(
             nonlocal started
             started = True
             _sync_repairs()
+            if coordinator.forecast_failures:
+                entry.async_create_background_task(
+                    hass, coordinator.async_request_refresh(), f"{DOMAIN}_started_retry"
+                )
 
         unsub = hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_started)
 

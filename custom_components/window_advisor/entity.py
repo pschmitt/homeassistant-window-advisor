@@ -75,8 +75,9 @@ class WindowAdvisorRoomEntity(WindowAdvisorEntity):
             manufacturer=MANUFACTURER,
             model="Room window advisor",
             entry_type=DeviceEntryType.SERVICE,
-            via_device=(DOMAIN, coordinator.config_entry.entry_id),
         )
+        if coordinator.hub_device_id is not None:
+            self._attr_device_info["via_device_id"] = coordinator.hub_device_id
 
     async def async_added_to_hass(self) -> None:
         """Put the room device into the room's area (once)."""

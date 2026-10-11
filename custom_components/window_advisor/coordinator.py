@@ -136,6 +136,7 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
             for subentry in config_entry.subentries.values()
             if subentry.subentry_type == SUBENTRY_TYPE_ROOM
         }
+        self.hub_device_id: str | None = None
         self.forecast_failures = 0
         self.last_forecast_error: str | None = None
         # Built-in target numbers register their current value here.
@@ -398,4 +399,21 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
         )
         self.config_entry.async_on_unload(
             async_track_state_change_event(self.hass, windows, _on_window)
+        )
+
+        @callback
+        def _on_weather(event: Event) -> None:
+            # At startup the weather integration often loads after us, so the
+            # first fetch fails. Retry as soon as it shows up instead of
+            # waiting a full forecast interval.
+            new = event.data["new_state"]
+            if self.forecast_failures and new is not None and new.state not in INVALID:
+                self.config_entry.async_create_background_task(
+                    self.hass, self.async_request_refresh(), f"{DOMAIN}_weather_retry"
+                )
+
+        self.config_entry.async_on_unload(
+            async_track_state_change_event(
+                self.hass, [self.weather_entity], _on_weather
+            )
         )
