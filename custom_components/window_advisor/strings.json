@@ -1,0 +1,175 @@
+{
+  "title": "Window Advisor",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Window Advisor",
+        "description": "Shared inputs for every room. Values were pre-filled from what was found in your setup.",
+        "data": {
+          "weather_entity": "Weather entity",
+          "outdoor_temperature_entity": "Outdoor temperature sensor",
+          "target_temperature_entity": "Target temperature (optional)",
+          "target_delta_entity": "Target temperature tolerance (optional)",
+          "forecast_interval": "Forecast update interval",
+          "ignore_idle_rooms": "Only list rooms that need it",
+          "discovery_repairs": "Suggest newly discovered rooms"
+        },
+        "data_description": {
+          "weather_entity": "Must provide an hourly forecast. It's used to tell when opening or closing will help next.",
+          "outdoor_temperature_entity": "A real outdoor sensor (or a median of several) is far more accurate than the weather entity.",
+          "target_temperature_entity": "An input_number, number or sensor. Leave empty to get a built-in number entity instead.",
+          "target_delta_entity": "How far the indoor temperature may drift from the target before advice kicks in. Leave empty for a built-in number entity.",
+          "forecast_interval": "How often the hourly forecast is fetched (seconds). Temperature changes are evaluated immediately regardless.",
+          "ignore_idle_rooms": "Alert-fatigue fix. When on, the whole-home advice only lists rooms whose own advisor recommends the action. When off, it behaves like the original templates and lists every room whose window isn't in the majority's state, even rooms that are fine.",
+          "discovery_repairs": "Raise a repair issue when an area gains window contacts and a temperature sensor but has no room yet."
+        }
+      },
+      "rooms": {
+        "title": "Discovered rooms",
+        "description": "Found {count} area(s) with window contacts and a temperature sensor. Pick the rooms to advise on; more can be added later.",
+        "data": {
+          "rooms": "Rooms"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Window Advisor is already set up.",
+      "single_instance_allowed": "Window Advisor is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Window Advisor settings",
+        "data": {
+          "weather_entity": "Weather entity",
+          "outdoor_temperature_entity": "Outdoor temperature sensor",
+          "target_temperature_entity": "Target temperature (optional)",
+          "target_delta_entity": "Target temperature tolerance (optional)",
+          "forecast_interval": "Forecast update interval",
+          "ignore_idle_rooms": "Only list rooms that need it",
+          "discovery_repairs": "Suggest newly discovered rooms"
+        },
+        "data_description": {
+          "weather_entity": "Must provide an hourly forecast. It's used to tell when opening or closing will help next.",
+          "outdoor_temperature_entity": "A real outdoor sensor (or a median of several) is far more accurate than the weather entity.",
+          "target_temperature_entity": "An input_number, number or sensor. Leave empty to get a built-in number entity instead.",
+          "target_delta_entity": "How far the indoor temperature may drift from the target before advice kicks in. Leave empty for a built-in number entity.",
+          "forecast_interval": "How often the hourly forecast is fetched (seconds). Temperature changes are evaluated immediately regardless.",
+          "ignore_idle_rooms": "Alert-fatigue fix. When on, the whole-home advice only lists rooms whose own advisor recommends the action. When off, it behaves like the original templates and lists every room whose window isn't in the majority's state, even rooms that are fine.",
+          "discovery_repairs": "Raise a repair issue when an area gains window contacts and a temperature sensor but has no room yet."
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "initiate_flow": {
+        "user": "Add room"
+      },
+      "entry_type": "Room",
+      "step": {
+        "user": {
+          "title": "Add room",
+          "description": "Pick the room's area to pre-fill window contacts and the temperature sensor, or leave it empty to configure everything by hand.\n\nDiscovered and not configured yet: {discovered}",
+          "data": {
+            "area": "Area"
+          }
+        },
+        "room": {
+          "title": "Room",
+          "data": {
+            "name": "Name",
+            "area": "Area",
+            "window_entities": "Window contacts",
+            "temperature_entity": "Indoor temperature sensor"
+          },
+          "data_description": {
+            "name": "Also determines the entity ids, e.g. binary_sensor.window_advisor_<name>.",
+            "area": "The room device is placed in this area.",
+            "window_entities": "Binary sensors that are on while a window or balcony door is open. The room counts as open when any of them is.",
+            "temperature_entity": "Prefer a smoothed/aggregated sensor (median, filtered)."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure room",
+          "data": {
+            "name": "Name",
+            "area": "Area",
+            "window_entities": "Window contacts",
+            "temperature_entity": "Indoor temperature sensor"
+          },
+          "data_description": {
+            "name": "Also determines the entity ids, e.g. binary_sensor.window_advisor_<name>.",
+            "area": "The room device is placed in this area.",
+            "window_entities": "Binary sensors that are on while a window or balcony door is open. The room counts as open when any of them is.",
+            "temperature_entity": "Prefer a smoothed/aggregated sensor (median, filtered)."
+          }
+        }
+      },
+      "error": {
+        "no_windows": "Pick at least one window contact.",
+        "name_in_use": "Another room already uses this name."
+      },
+      "abort": {
+        "already_configured": "This area already has a room.",
+        "reconfigure_successful": "Room updated."
+      }
+    }
+  },
+  "issues": {
+    "room_discovered": {
+      "title": "🪟 New room for the Window Advisor: {name}",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Add {name} to the Window Advisor?",
+            "description": "**{name}** has window contacts and a temperature sensor but no Window Advisor room yet.\n\n- Windows: {windows}\n- Temperature: {temperature}\n\nSubmit to add it. To never be asked about this area again, ignore this issue instead."
+          }
+        },
+        "abort": {
+          "room_gone": "This area no longer has window contacts or a temperature sensor."
+        }
+      }
+    },
+    "missing_entities": {
+      "title": "🪟 Window Advisor: {owner} references missing entities",
+      "fix_flow": {
+        "step": {
+          "hub": {
+            "title": "Replace missing entities",
+            "description": "Some of the configured entities no longer exist. Pick replacements.",
+            "data": {
+              "weather_entity": "Weather entity",
+              "outdoor_temperature_entity": "Outdoor temperature sensor",
+              "target_temperature_entity": "Target temperature (optional)",
+              "target_delta_entity": "Target temperature tolerance (optional)"
+            }
+          },
+          "room": {
+            "title": "Replace missing entities of {name}",
+            "description": "Pick replacements for the entities that no longer exist.",
+            "data": {
+              "window_entities": "Window contacts",
+              "temperature_entity": "Indoor temperature sensor"
+            }
+          }
+        },
+        "abort": {
+          "entry_gone": "The Window Advisor is no longer set up.",
+          "room_gone": "The room no longer exists."
+        }
+      }
+    },
+    "forecast_unavailable": {
+      "title": "🪟 Window Advisor: no hourly forecast from {entity_id}",
+      "description": "Fetching the hourly forecast from `{entity_id}` failed {failures} times in a row (last error: {error}). Advice uses the last good forecast until it recovers. Check the weather integration, or pick another weather entity in the Window Advisor options."
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Refresh",
+      "description": "Fetch the hourly forecast now and re-evaluate every room."
+    }
+  }
+}

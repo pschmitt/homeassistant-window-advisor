@@ -1,0 +1,210 @@
+{# window-advisor when-to-[open|close] sensors #}
+
+{# window_advisor.jinja #}
+{% macro when_to(
+  action,
+  indoor_temp_entity,
+  outdoor_temp_entity,
+  target_temp_entity,
+  target_delta_entity,
+  weather_data
+) %}
+{# --- Inputs --- #}
+{% set indoor_temp  = states(indoor_temp_entity)  | float %}
+{% set outdoor_temp = states(outdoor_temp_entity) | float %}
+{% set target_temp  = states(target_temp_entity)  | float %}
+{% set target_delta = states(target_delta_entity) | float %}
+{% set fd = weather_data | default({}) %}
+
+{# --- Resolve forecast robustly --- #}
+{% set forecast = fd.get('forecast') if fd is mapping else none %}
+
+{% if forecast is none and fd is mapping %}
+  {% set ns = namespace(eid=None, f=None) %}
+  {% for k in fd.keys() %}
+    {% if k and k[:8] == 'weather.' %}
+      {% set ns.eid = k %}
+      {% set ns.f = fd[k].get('forecast') %}
+    {% endif %}
+  {% endfor %}
+  {% set forecast = ns.f %}
+{% endif %}
+
+{% if forecast is none %}
+  {% set ns = namespace(f=None) %}
+  {% for e in states.weather %}
+    {% set f = state_attr(e.entity_id, 'forecast') %}
+    {% if f %}
+      {% set ns.f = f %}
+    {% endif %}
+  {% endfor %}
+  {% set forecast = ns.f or [] %}
+{% else %}
+  {% set forecast = forecast or [] %}
+{% endif %}
+
+{# Only consider future forecast entries; older points create stale "NOW!" close/open advice. #}
+{% set ns = namespace(future_forecast=[]) %}
+{% for item in forecast %}
+  {% set dt = item.datetime | default(none) | as_datetime %}
+  {% if dt is not none and dt | as_local > now() %}
+    {% set ns.future_forecast = ns.future_forecast + [item] %}
+  {% endif %}
+{% endfor %}
+{% set future_forecast = ns.future_forecast %}
+
+{# First hotter/cooler times vs current indoor.
+   Built as a list first and indexed rather than piped through | first,
+   since | first on an empty sequence logs a noisy "No first item,
+   sequence was empty" template warning on every render where the
+   forecast has no hotter/cooler point (e.g. a flat or one-sided
+   forecast, or no forecast data yet). #}
+{% set hotter_times = future_forecast
+  | selectattr('temperature', '>', indoor_temp)
+  | map(attribute='datetime') | map('as_datetime') | map('as_local')
+  | list %}
+{% set cooler_times = future_forecast
+  | selectattr('temperature', '<', indoor_temp)
+  | map(attribute='datetime') | map('as_datetime') | map('as_local')
+  | list %}
+{% set first_hotter = hotter_times[0] if hotter_times else none %}
+{% set first_cooler = cooler_times[0] if cooler_times else none %}
+
+{# Flags #}
+{% set too_cold       = indoor_temp < (target_temp - target_delta) %}
+{% set too_hot        = indoor_temp > (target_temp + target_delta) %}
+{% set outside_cooler = outdoor_temp < indoor_temp %}
+{% set outside_hotter = outdoor_temp > indoor_temp %}
+
+{# Decisions #}
+{% if action == 'open' %}
+  {% if (too_hot and outside_cooler) or (too_cold and outside_hotter) %}
+    {{ now().isoformat() }}
+  {% elif too_cold %}
+    {{ first_hotter.isoformat() if first_hotter else 'unknown' }}
+  {% elif too_hot %}
+    {{ first_cooler.isoformat() if first_cooler else 'unknown' }}
+  {% else %}
+    All good
+  {% endif %}
+{% elif action == 'close' %}
+  {% if (too_cold and outside_cooler) or (too_hot and outside_hotter) %}
+    {{ now().isoformat() }}
+  {% elif too_cold %}
+    {# No cooler hour in the horizon -> closing will not be needed #}
+    {{ first_cooler.isoformat() if first_cooler else 'All good' }}
+  {% elif too_hot %}
+    {# No hotter hour in the horizon -> closing will not be needed #}
+    {{ first_hotter.isoformat() if first_hotter else 'All good' }}
+  {% else %}
+    All good
+  {% endif %}
+{% else %}
+  unknown
+{% endif %}
+{% endmacro %}
+
+{# Back-compat shims without entity arg #}
+{% macro when_to_open(indoor, outdoor, target, delta, weather_data) %}
+  {{ when_to('open',  indoor, outdoor, target, delta, weather_data) }}
+{% endmacro %}
+{% macro when_to_close(indoor, outdoor, target, delta, weather_data) %}
+  {{ when_to('close', indoor, outdoor, target, delta, weather_data) }}
+{% endmacro %}
+
+{# time delta #}
+{% macro timedelta(t) %}
+{% set state = t | as_datetime %}
+{% if t is not defined or t in ["All good", "unknown", "unavailable"] or state is none %}
+  N/A
+{% else %}
+  {%- if state < now() -%}
+    NOW!
+  {%- else -%}
+    {%- set rel = (state - now()).total_seconds() | int -%}
+    {%- set days = (rel // 86400) -%}
+    {%- set hours = ((rel % 86400) // 3600) -%}
+    {%- set minutes = ((rel % 3600) // 60) -%}
+    {% if days > 0 %}{{ days }}days {% endif %}{{ hours }}h{{ "%02d"|format(minutes) }}
+  {%- endif -%}
+{% endif %}
+{% endmacro %}
+
+{% macro message(
+  st,
+  temperature_delta_entity,
+  temperature_diff_entity,
+  timedelta
+) %}
+{%- set delta = states(temperature_delta_entity) -%}
+{%- set unit = state_attr(temperature_delta_entity, "unit_of_measurement") -%}
+{%- set colder_outside = is_state(temperature_diff_entity, "on") -%}
+{%- if st is not defined or st in ["unknown", "unavailable", "All good"] -%}
+  N/A
+{%- elif delta not in ["unknown", "unavailable"] -%}
+  {{ '❄️' if colder_outside else '🔥' }} {{ timedelta }} (Δ {{ delta }}{{ unit }})
+{%- else -%}
+  {{ timedelta }}
+{%- endif -%}
+{% endmacro %}
+
+{# window advisor macros #}
+
+{# NOTE: keep output whitespace-tight ({%- -%}) — callers compare the result
+   with == 'open' / == 'close', which breaks on padded output. #}
+{% macro advice(window_entity, open_sensor, close_sensor) -%}
+{%- set window_state = states(window_entity) -%}
+{%- set open_state = states(open_sensor) -%}
+{%- set close_state = states(close_sensor) -%}
+{%- set open_td  = state_attr(open_sensor,  "timedelta") -%}
+{%- set close_td = state_attr(close_sensor, "timedelta") -%}
+{%- if open_td is not none and close_td is not none -%}
+  {%- set open_now  = open_td == "NOW!" -%}
+  {%- set close_now = close_td == "NOW!" -%}
+  {%- set open_at = open_state | as_datetime -%}
+  {%- set close_at = close_state | as_datetime -%}
+  {{- 'open' if (open_now and not close_now)
+     or (open_now and close_now and open_at is not none and close_at is not none and open_at > close_at)
+     or (open_now and close_now and (open_at is none or close_at is none) and window_state == 'off')
+     else 'close' if (close_now and not open_now)
+     or (open_now and close_now and open_at is not none and close_at is not none and close_at > open_at)
+     or (open_now and close_now and (open_at is none or close_at is none) and window_state == 'on')
+     else 'nothing' -}}
+{%- else -%}
+N/A
+{%- endif -%}
+{%- endmacro %}
+
+{# NOTE: trims advice_str and emits tight output — see advice() note above. #}
+{% macro todo(window_entity, advice_str) -%}
+{%- set window_state = states(window_entity) -%}
+{%- set advice_str = advice_str | trim -%}
+{%- if advice_str == 'N/A' -%}
+N/A
+{%- elif advice_str == 'open' and window_state != 'on' -%}
+open
+{%- elif advice_str == 'close' and window_state != 'off' -%}
+close
+{%- else -%}
+nothing
+{%- endif -%}
+{%- endmacro %}
+
+{% macro availability(window_entity, open_sensor, close_sensor) -%}
+{{ states(window_entity) not in ["unavailable","unknown"]
+   and states(open_sensor)  not in ["unavailable","unknown"]
+   and states(close_sensor) not in ["unavailable","unknown"] }}
+{%- endmacro %}
+
+{% macro window_advisor_icon(window_entity, todo_str) -%}
+{% set window_state = states(window_entity) %}
+{% if todo_str in [none, 'N/A', 'unknown', 'unavailable'] %}
+  mdi:map-marker-question
+{% elif todo_str == "close" %}
+  {{ "mdi:window-closed-variant" if window_state == "on" else "mdi:thumb-up" }}
+{% elif todo_str == "open" %}
+  {{ "mdi:window-open-variant" if window_state == "off" else "mdi:thumb-up" }}
+{% else %}
+  mdi:thumb-up
+{% endif %}
+{%- endmacro %}

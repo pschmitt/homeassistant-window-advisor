@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a7bd5"/>
+      <stop offset="1" stop-color="#f5a623"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="512" height="512" rx="104" fill="url(#bg)"/>
+  <!-- Snowflake hint (cold, top-left) and sun hint (warm, bottom-right) -->
+  <g stroke="#ffffff" stroke-width="10" stroke-linecap="round" opacity="0.22">
+    <path d="M96 66 V126 M70 81 L122 111 M70 111 L122 81"/>
+  </g>
+  <circle cx="420" cy="420" r="40" fill="#ffffff" opacity="0.22"/>
+  <!-- Window frame -->
+  <g fill="none" stroke="#ffffff" stroke-width="24" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="132" y="112" width="200" height="288" rx="10"/>
+    <path d="M232 112 V400"/>
+    <!-- Right sash swung open towards the viewer -->
+    <path d="M332 112 L404 144 L404 432 L332 400"/>
+  </g>
+  <!-- Airflow -->
+  <g fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round">
+    <path d="M160 214 C188 196 210 232 238 214 S288 196 300 210"/>
+    <path d="M160 292 C188 274 210 310 238 292 S288 274 300 288"/>
+  </g>
+</svg>
