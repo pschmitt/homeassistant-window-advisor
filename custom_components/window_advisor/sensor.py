@@ -46,9 +46,7 @@ class WhenToSensor(WindowAdvisorRoomEntity, SensorEntity):
     sensor, to stay compatible with the template sensor it replaces).
     """
 
-    def __init__(
-        self, coordinator: WindowAdvisorCoordinator, room: Room, action: str
-    ) -> None:
+    def __init__(self, coordinator: WindowAdvisorCoordinator, room: Room, action: str) -> None:
         """Initialize the sensor."""
         super().__init__(
             coordinator,
@@ -59,9 +57,7 @@ class WhenToSensor(WindowAdvisorRoomEntity, SensorEntity):
         )
         self._action = action
         self._attr_icon = (
-            "mdi:window-open-variant"
-            if action == ACTION_OPEN
-            else "mdi:window-closed-variant"
+            "mdi:window-open-variant" if action == ACTION_OPEN else "mdi:window-closed-variant"
         )
 
     @property

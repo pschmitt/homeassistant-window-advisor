@@ -48,9 +48,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, entry: WindowAdvisorConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: WindowAdvisorConfigEntry) -> bool:
     """Set up Window Advisor from a config entry."""
     coordinator = WindowAdvisorCoordinator(hass, entry)
     entry.runtime_data = coordinator
@@ -67,23 +65,17 @@ async def async_setup_entry(
     # until the first evaluation.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     coordinator.async_setup_listeners()
-    entry.async_create_background_task(
-        hass, coordinator.async_refresh(), f"{DOMAIN}_first_refresh"
-    )
+    entry.async_create_background_task(hass, coordinator.async_refresh(), f"{DOMAIN}_first_refresh")
 
     entry.async_on_unload(
-        coordinator.async_add_listener(
-            lambda: async_sync_forecast_issue(hass, coordinator)
-        )
+        coordinator.async_add_listener(lambda: async_sync_forecast_issue(hass, coordinator))
     )
 
     @callback
     def _sync_repairs(*_args: object) -> None:
         async_sync_issues(hass, entry, coordinator)
 
-    entry.async_on_unload(
-        async_track_time_interval(hass, _sync_repairs, REPAIRS_INTERVAL)
-    )
+    entry.async_on_unload(async_track_time_interval(hass, _sync_repairs, REPAIRS_INTERVAL))
     # Entities of other integrations are still loading during startup; only
     # check for missing ones once everything is up.
     if hass.state is CoreState.running:
@@ -115,9 +107,7 @@ async def async_setup_entry(
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: WindowAdvisorConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: WindowAdvisorConfigEntry) -> bool:
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
@@ -125,8 +115,6 @@ async def async_unload_entry(
     return unloaded
 
 
-async def _async_reload_on_update(
-    hass: HomeAssistant, entry: WindowAdvisorConfigEntry
-) -> None:
+async def _async_reload_on_update(hass: HomeAssistant, entry: WindowAdvisorConfigEntry) -> None:
     """Reload when options or rooms change (the entity set changes)."""
     await hass.config_entries.async_reload(entry.entry_id)

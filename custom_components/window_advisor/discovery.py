@@ -87,9 +87,7 @@ def _window_entities(hass: HomeAssistant, entity_ids: list[str]) -> list[str]:
 
 
 @callback
-def _temperature_entity(
-    hass: HomeAssistant, area_id: str, entity_ids: list[str]
-) -> str | None:
+def _temperature_entity(hass: HomeAssistant, area_id: str, entity_ids: list[str]) -> str | None:
     """Best temperature sensor for an area."""
     # Helpers like sensor.<area>_temperature_filtered often have no area.
     for suffix in _TEMP_PREFERRED_SUFFIXES:

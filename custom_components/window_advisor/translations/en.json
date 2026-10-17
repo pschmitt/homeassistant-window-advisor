@@ -85,7 +85,7 @@
             "temperature_entity": "Indoor temperature sensor"
           },
           "data_description": {
-            "name": "Also determines the entity ids, e.g. binary_sensor.window_advisor_<name>.",
+            "name": "Also determines the entity ids, e.g. binary_sensor.window_advisor_living_room.",
             "area": "The room device is placed in this area.",
             "window_entities": "Binary sensors that are on while a window or balcony door is open. The room counts as open when any of them is.",
             "temperature_entity": "Prefer a smoothed/aggregated sensor (median, filtered)."
@@ -100,7 +100,7 @@
             "temperature_entity": "Indoor temperature sensor"
           },
           "data_description": {
-            "name": "Also determines the entity ids, e.g. binary_sensor.window_advisor_<name>.",
+            "name": "Also determines the entity ids, e.g. binary_sensor.window_advisor_living_room.",
             "area": "The room device is placed in this area.",
             "window_entities": "Binary sensors that are on while a window or balcony door is open. The room counts as open when any of them is.",
             "temperature_entity": "Prefer a smoothed/aggregated sensor (median, filtered)."

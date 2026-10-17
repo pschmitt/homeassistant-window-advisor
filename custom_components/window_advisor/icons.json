@@ -1,5 +1,4 @@
 {
-  "integration": "mdi:window-open-variant",
   "services": {
     "refresh": {
       "service": "mdi:refresh"

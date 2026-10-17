@@ -126,9 +126,7 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
             name=DOMAIN,
             config_entry=config_entry,
             update_interval=timedelta(
-                seconds=config_entry.options.get(
-                    CONF_FORECAST_INTERVAL, DEFAULT_FORECAST_INTERVAL
-                )
+                seconds=config_entry.options.get(CONF_FORECAST_INTERVAL, DEFAULT_FORECAST_INTERVAL)
             ),
         )
         self.rooms: dict[str, Room] = {
@@ -218,9 +216,7 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
     # ------------------------------------------------------------------
     # Evaluation
     # ------------------------------------------------------------------
-    def _compute_rooms(
-        self, forecast: tuple[ForecastPoint, ...]
-    ) -> dict[str, RoomWhenTo | None]:
+    def _compute_rooms(self, forecast: tuple[ForecastPoint, ...]) -> dict[str, RoomWhenTo | None]:
         now = dt_util.now()
         outdoor = self._float_state(self.outdoor_entity)
         target = self.target(CONF_TARGET_TEMPERATURE_ENTITY)
@@ -232,11 +228,7 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
                 result[room.subentry_id] = None
                 continue
             indoor_state = self.hass.states.get(room.temperature_entity)
-            unit = (
-                indoor_state.attributes.get(ATTR_UNIT_OF_MEASUREMENT)
-                if indoor_state
-                else None
-            )
+            unit = indoor_state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) if indoor_state else None
             kwargs = {
                 "indoor_temp": indoor,
                 "outdoor_temp": outdoor,
@@ -280,9 +272,7 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
                     when_to_close=when.close.state if when else STATE_UNAVAILABLE,
                 )
             )
-        return evaluate_aggregate(
-            statuses, dt_util.now(), ignore_idle_rooms=self.ignore_idle_rooms
-        )
+        return evaluate_aggregate(statuses, dt_util.now(), ignore_idle_rooms=self.ignore_idle_rooms)
 
     # ------------------------------------------------------------------
     # Updates
@@ -369,11 +359,7 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
             if (entity_id := self.external_target(key))
         ]
         temperature_inputs += [room.temperature_entity for room in self.rooms.values()]
-        windows = [
-            entity_id
-            for room in self.rooms.values()
-            for entity_id in room.window_entities
-        ]
+        windows = [entity_id for room in self.rooms.values() for entity_id in room.window_entities]
 
         @callback
         def _on_temperature(event: Event) -> None:
@@ -391,9 +377,7 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
             self.async_update_listeners()
 
         self.config_entry.async_on_unload(
-            async_track_state_change_event(
-                self.hass, temperature_inputs, _on_temperature
-            )
+            async_track_state_change_event(self.hass, temperature_inputs, _on_temperature)
         )
         self.config_entry.async_on_unload(
             async_track_state_change_event(self.hass, windows, _on_window)
@@ -411,7 +395,5 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
                 )
 
         self.config_entry.async_on_unload(
-            async_track_state_change_event(
-                self.hass, [self.weather_entity], _on_weather
-            )
+            async_track_state_change_event(self.hass, [self.weather_entity], _on_weather)
         )

@@ -131,12 +131,8 @@ def when_to(
     # Only consider future forecast entries; older points create stale "NOW!"
     # close/open advice.
     future = [point for point in forecast if point.datetime > now]
-    first_hotter = next(
-        (p.datetime for p in future if p.temperature > indoor_temp), None
-    )
-    first_cooler = next(
-        (p.datetime for p in future if p.temperature < indoor_temp), None
-    )
+    first_hotter = next((p.datetime for p in future if p.temperature > indoor_temp), None)
+    first_cooler = next((p.datetime for p in future if p.temperature < indoor_temp), None)
 
     too_cold = indoor_temp < (target_temp - target_delta)
     too_hot = indoor_temp > (target_temp + target_delta)
@@ -297,13 +293,9 @@ def room_icon(window_state: str, todo: str | None) -> str:
     if todo in (None, NOT_AVAILABLE, *INVALID_STATES):
         return "mdi:map-marker-question"
     if todo == ACTION_CLOSE:
-        return (
-            "mdi:window-closed-variant" if window_state == STATE_ON else "mdi:thumb-up"
-        )
+        return "mdi:window-closed-variant" if window_state == STATE_ON else "mdi:thumb-up"
     if todo == ACTION_OPEN:
-        return (
-            "mdi:window-open-variant" if window_state == STATE_OFF else "mdi:thumb-up"
-        )
+        return "mdi:window-open-variant" if window_state == STATE_OFF else "mdi:thumb-up"
     return "mdi:thumb-up"
 
 
@@ -356,8 +348,7 @@ def evaluate_aggregate(
     need = tuple(
         room.name
         for room in rooms
-        if _needs(target, room.window_state)
-        and (not ignore_idle_rooms or room.advice == target)
+        if _needs(target, room.window_state) and (not ignore_idle_rooms or room.advice == target)
     )
     todo = f"{target.capitalize()}: {', '.join(need)}" if need else ACTION_NOTHING
 

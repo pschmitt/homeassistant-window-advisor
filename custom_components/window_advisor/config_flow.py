@@ -87,9 +87,7 @@ def _hub_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Required(
                 CONF_OUTDOOR_TEMPERATURE_ENTITY,
                 description=_suggested(defaults.get(CONF_OUTDOOR_TEMPERATURE_ENTITY)),
-            ): EntitySelector(
-                EntitySelectorConfig(domain="sensor", device_class="temperature")
-            ),
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class="temperature")),
             vol.Optional(
                 CONF_TARGET_TEMPERATURE_ENTITY,
                 description=_suggested(defaults.get(CONF_TARGET_TEMPERATURE_ENTITY)),
@@ -126,8 +124,7 @@ def _hub_options(user_input: dict[str, Any]) -> dict[str, Any]:
     return {
         CONF_WEATHER_ENTITY: user_input[CONF_WEATHER_ENTITY],
         CONF_OUTDOOR_TEMPERATURE_ENTITY: user_input[CONF_OUTDOOR_TEMPERATURE_ENTITY],
-        CONF_TARGET_TEMPERATURE_ENTITY: user_input.get(CONF_TARGET_TEMPERATURE_ENTITY)
-        or "",
+        CONF_TARGET_TEMPERATURE_ENTITY: user_input.get(CONF_TARGET_TEMPERATURE_ENTITY) or "",
         CONF_TARGET_DELTA_ENTITY: user_input.get(CONF_TARGET_DELTA_ENTITY) or "",
         CONF_FORECAST_INTERVAL: int(user_input[CONF_FORECAST_INTERVAL]),
         CONF_IGNORE_IDLE_ROOMS: bool(user_input[CONF_IGNORE_IDLE_ROOMS]),
@@ -139,24 +136,18 @@ def _room_schema(defaults: dict[str, Any]) -> vol.Schema:
     """Schema for a room."""
     return vol.Schema(
         {
-            vol.Required(
-                CONF_NAME, default=defaults.get(CONF_NAME, "")
-            ): TextSelector(),
+            vol.Required(CONF_NAME, default=defaults.get(CONF_NAME, "")): TextSelector(),
             vol.Optional(
                 CONF_AREA, description=_suggested(defaults.get(CONF_AREA))
             ): AreaSelector(),
             vol.Required(
                 CONF_WINDOW_ENTITIES,
                 default=list(defaults.get(CONF_WINDOW_ENTITIES, [])),
-            ): EntitySelector(
-                EntitySelectorConfig(domain="binary_sensor", multiple=True)
-            ),
+            ): EntitySelector(EntitySelectorConfig(domain="binary_sensor", multiple=True)),
             vol.Required(
                 CONF_TEMPERATURE_ENTITY,
                 description=_suggested(defaults.get(CONF_TEMPERATURE_ENTITY)),
-            ): EntitySelector(
-                EntitySelectorConfig(domain="sensor", device_class="temperature")
-            ),
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class="temperature")),
         }
     )
 
@@ -227,9 +218,7 @@ class WindowAdvisorConfigFlow(ConfigFlow, domain=DOMAIN):
         """Rooms are managed as subentries."""
         return {SUBENTRY_TYPE_ROOM: RoomSubentryFlowHandler}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Shared inputs (pre-filled from discovery)."""
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
@@ -245,19 +234,14 @@ class WindowAdvisorConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=_hub_schema(_hub_defaults(self.hass))
         )
 
-    async def async_step_rooms(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_rooms(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Pick which discovered rooms to set up."""
         if user_input is not None:
             selected = set(user_input.get(CONF_ROOMS, []))
-            return self._create(
-                [room for room in self._discovered if room.area_id in selected]
-            )
+            return self._create([room for room in self._discovered if room.area_id in selected])
 
         options = [
-            SelectOptionDict(value=room.area_id, label=room.label)
-            for room in self._discovered
+            SelectOptionDict(value=room.area_id, label=room.label) for room in self._discovered
         ]
         schema = vol.Schema(
             {
@@ -284,9 +268,7 @@ class WindowAdvisorConfigFlow(ConfigFlow, domain=DOMAIN):
 class WindowAdvisorOptionsFlow(OptionsFlow):
     """Handle the shared options."""
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the shared inputs."""
         if user_input is not None:
             return self.async_create_entry(title="", data=_hub_options(user_input))
@@ -304,9 +286,7 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
         """Initialize the flow."""
         self._defaults: dict[str, Any] = {}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> SubentryFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Pick an area to pre-fill the room from (optional)."""
         entry = self._get_entry()
         if user_input is not None:
@@ -333,9 +313,7 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
                 {
                     vol.Optional(
                         CONF_AREA,
-                        description=_suggested(
-                            unconfigured[0].area_id if unconfigured else None
-                        ),
+                        description=_suggested(unconfigured[0].area_id if unconfigured else None),
                     ): AreaSelector()
                 }
             ),
@@ -344,9 +322,7 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
             },
         )
 
-    async def async_step_room(
-        self, user_input: dict[str, Any] | None = None
-    ) -> SubentryFlowResult:
+    async def async_step_room(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Room details (name, window contacts, temperature)."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -399,9 +375,7 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
             errors=errors,
         )
 
-    def _validate(
-        self, user_input: dict[str, Any], exclude: str | None = None
-    ) -> dict[str, str]:
+    def _validate(self, user_input: dict[str, Any], exclude: str | None = None) -> dict[str, str]:
         errors: dict[str, str] = {}
         if not user_input.get(CONF_WINDOW_ENTITIES):
             errors[CONF_WINDOW_ENTITIES] = "no_windows"

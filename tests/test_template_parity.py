@@ -28,16 +28,12 @@ def _as_datetime(value):
 
 
 def _env(states: dict[str, str], attrs: dict[str, dict]) -> jinja2.Environment:
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(FIXTURES), extensions=["jinja2.ext.do"]
-    )
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(FIXTURES), extensions=["jinja2.ext.do"])
     env.filters["as_datetime"] = _as_datetime
     env.filters["as_local"] = lambda value: value.astimezone(NOW.tzinfo)
     env.globals["now"] = lambda: NOW
     env.globals["states"] = lambda entity_id: states.get(entity_id, "unknown")
-    env.globals["state_attr"] = lambda entity_id, attr: attrs.get(entity_id, {}).get(
-        attr
-    )
+    env.globals["state_attr"] = lambda entity_id, attr: attrs.get(entity_id, {}).get(attr)
     return env
 
 
@@ -57,9 +53,7 @@ def test_when_to_and_room_parity(seed: int) -> None:
     temps = [round(rng.uniform(0, 35), 1) for _ in range(rng.randint(0, 30))]
     forecast = [
         {
-            "datetime": (
-                NOW + timedelta(hours=start + i, minutes=-NOW.minute)
-            ).isoformat(),
+            "datetime": (NOW + timedelta(hours=start + i, minutes=-NOW.minute)).isoformat(),
             "temperature": t,
         }
         for i, t in enumerate(temps)
@@ -116,12 +110,8 @@ def test_when_to_and_room_parity(seed: int) -> None:
         "sensor.close": {"timedelta": results["close"].timedelta},
     }
     env = _env(states, attrs)
-    expected_advice = _render(
-        env, "advice('binary_sensor.window', 'sensor.open', 'sensor.close')"
-    )
+    expected_advice = _render(env, "advice('binary_sensor.window', 'sensor.open', 'sensor.close')")
     room = advisor.evaluate_room(window, results["open"], results["close"])
     assert room.advice == expected_advice
     assert room.todo == _render(env, f"todo('binary_sensor.window', '{room.advice}')")
-    assert room.icon == _render(
-        env, f"window_advisor_icon('binary_sensor.window', '{room.todo}')"
-    )
+    assert room.icon == _render(env, f"window_advisor_icon('binary_sensor.window', '{room.todo}')")

@@ -74,10 +74,7 @@ def async_sync_forecast_issue(
 ) -> None:
     """Raise/clear the forecast issue (cheap; runs on every update)."""
     wanted = {}
-    if (
-        coordinator is not None
-        and coordinator.forecast_failures >= FORECAST_FAILURES_BEFORE_ISSUE
-    ):
+    if coordinator is not None and coordinator.forecast_failures >= FORECAST_FAILURES_BEFORE_ISSUE:
         wanted[ISSUE_FORECAST_UNAVAILABLE] = {
             "is_fixable": False,
             "severity": ir.IssueSeverity.WARNING,
@@ -111,8 +108,7 @@ def async_sync_issues(
             gone = [
                 entity_id
                 for entity_id in entity_ids
-                if hass.states.get(entity_id) is None
-                and ent_reg.async_get(entity_id) is None
+                if hass.states.get(entity_id) is None and ent_reg.async_get(entity_id) is None
             ]
             if not gone:
                 continue
@@ -160,15 +156,11 @@ class RoomDiscoveredRepairFlow(RepairsFlow):
         """Store the issue data."""
         self._data = data
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Entry point."""
         return await self.async_step_confirm()
 
-    async def async_step_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Confirm and create the room."""
         entry = _entry(self.hass, self._data["entry_id"])
         room = async_discover_room(self.hass, self._data["area_id"])
@@ -211,9 +203,7 @@ class MissingEntitiesRepairFlow(RepairsFlow):
         """Store the issue data."""
         self._data = data
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Entry point."""
         entry = _entry(self.hass, self._data["entry_id"])
         if entry is None:
@@ -225,9 +215,7 @@ class MissingEntitiesRepairFlow(RepairsFlow):
             return self.async_abort(reason="room_gone")
         return await self.async_step_room()
 
-    async def async_step_hub(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_hub(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Replace hub entities."""
         entry = _entry(self.hass, self._data["entry_id"])
         assert entry is not None
@@ -236,9 +224,7 @@ class MissingEntitiesRepairFlow(RepairsFlow):
             for key in (CONF_TARGET_TEMPERATURE_ENTITY, CONF_TARGET_DELTA_ENTITY):
                 options[key] = user_input.get(key) or ""
             options[CONF_WEATHER_ENTITY] = user_input[CONF_WEATHER_ENTITY]
-            options[CONF_OUTDOOR_TEMPERATURE_ENTITY] = user_input[
-                CONF_OUTDOOR_TEMPERATURE_ENTITY
-            ]
+            options[CONF_OUTDOOR_TEMPERATURE_ENTITY] = user_input[CONF_OUTDOOR_TEMPERATURE_ENTITY]
             self.hass.config_entries.async_update_entry(entry, options=options)
             return self.async_create_entry(data={})
 
@@ -260,14 +246,10 @@ class MissingEntitiesRepairFlow(RepairsFlow):
         )
         return self.async_show_form(
             step_id="hub",
-            data_schema=self.add_suggested_values_to_schema(
-                schema, self._existing(entry.options)
-            ),
+            data_schema=self.add_suggested_values_to_schema(schema, self._existing(entry.options)),
         )
 
-    async def async_step_room(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_room(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Replace a room's entities."""
         entry = _entry(self.hass, self._data["entry_id"])
         assert entry is not None
@@ -291,9 +273,7 @@ class MissingEntitiesRepairFlow(RepairsFlow):
         )
         return self.async_show_form(
             step_id="room",
-            data_schema=self.add_suggested_values_to_schema(
-                schema, self._existing(subentry.data)
-            ),
+            data_schema=self.add_suggested_values_to_schema(schema, self._existing(subentry.data)),
             description_placeholders={"name": subentry.title},
         )
 

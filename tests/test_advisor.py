@@ -9,9 +9,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 # Load advisor.py directly: importing the package would pull in Home Assistant.
-_PATH = (
-    Path(__file__).parent.parent / "custom_components" / "window_advisor" / "advisor.py"
-)
+_PATH = Path(__file__).parent.parent / "custom_components" / "window_advisor" / "advisor.py"
 _SPEC = importlib.util.spec_from_file_location("advisor", _PATH)
 advisor = importlib.util.module_from_spec(_SPEC)
 sys.modules["advisor"] = advisor
@@ -22,10 +20,7 @@ NOW = datetime(2026, 10, 11, 20, 0, 0, tzinfo=TZ)
 
 
 def _forecast(*temps: float) -> list:
-    return [
-        advisor.ForecastPoint(NOW + timedelta(hours=i + 1), t)
-        for i, t in enumerate(temps)
-    ]
+    return [advisor.ForecastPoint(NOW + timedelta(hours=i + 1), t) for i, t in enumerate(temps)]
 
 
 def _when(action: str, indoor: float, outdoor: float, forecast=()) -> str:
@@ -50,18 +45,12 @@ def test_when_to_too_cold_and_colder_outside() -> None:
     assert _when("close", 17.98, 9.8) == NOW.isoformat()
     # No hotter hour ahead: opening can't be scheduled.
     assert _when("open", 17.98, 9.8, _forecast(9, 8, 7)) == "unknown"
-    assert (
-        _when("open", 17.98, 9.8, _forecast(9, 19, 7))
-        == (NOW + timedelta(hours=2)).isoformat()
-    )
+    assert _when("open", 17.98, 9.8, _forecast(9, 19, 7)) == (NOW + timedelta(hours=2)).isoformat()
 
 
 def test_when_to_too_hot() -> None:
     assert _when("open", 25.0, 18.0) == NOW.isoformat()
-    assert (
-        _when("close", 25.0, 18.0, _forecast(20, 26))
-        == (NOW + timedelta(hours=2)).isoformat()
-    )
+    assert _when("close", 25.0, 18.0, _forecast(20, 26)) == (NOW + timedelta(hours=2)).isoformat()
     # No hotter hour ahead -> closing won't be needed.
     assert _when("close", 25.0, 18.0, _forecast(20, 21)) == "All good"
 
@@ -77,10 +66,7 @@ def test_format_timedelta() -> None:
     assert fmt("unknown", NOW) == "N/A"
     assert fmt(NOW.isoformat(), NOW) == "NOW!"
     assert fmt((NOW + timedelta(hours=2, minutes=5)).isoformat(), NOW) == "2h05"
-    assert (
-        fmt((NOW + timedelta(days=1, hours=2, minutes=5)).isoformat(), NOW)
-        == "1days 2h05"
-    )
+    assert fmt((NOW + timedelta(days=1, hours=2, minutes=5)).isoformat(), NOW) == "1days 2h05"
 
 
 def test_relative_datetime() -> None:
@@ -173,9 +159,7 @@ def test_aggregate_ignore_idle_keeps_actionable_rooms() -> None:
         _status("Living Room", "on", "close"),
         _status("Office", "on", "nothing"),
     ]
-    assert advisor.evaluate_aggregate(rooms, NOW).todo == (
-        "Close: Bedroom, Living Room, Office"
-    )
+    assert advisor.evaluate_aggregate(rooms, NOW).todo == ("Close: Bedroom, Living Room, Office")
     assert (
         advisor.evaluate_aggregate(rooms, NOW, ignore_idle_rooms=True).todo
         == "Close: Bedroom, Living Room"
