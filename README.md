@@ -1,95 +1,47 @@
-# Window Advisor — Home Assistant integration
+<p align="center">
+  <img src="logo.png" width="128" alt="Window Advisor logo">
+</p>
 
-[![Open this integration in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=pschmitt&repository=homeassistant-window-advisor&category=integration)
+<p align="center">
+  <a href="https://my.home-assistant.io/redirect/marketplace_repository/?owner=pschmitt&amp;repository=homeassistant-window-advisor&amp;category=integration"><img src="https://my.home-assistant.io/badges/marketplace_repository.svg" alt="Open this integration in Home Assistant Marketplace"></a>
+</p>
 
-<img src="custom_components/window_advisor/brand/icon.png" width="96" align="right" alt="Window Advisor icon">
+<h1 align="center">Window Advisor</h1>
 
-Tells you **when to open or close the windows**, per room and for the whole
-home, so rooms drift towards a target temperature for free: open up when it's
-cooler outside and the room is too hot (or the other way round), close again
-before the outside turns against you.
+<p align="center">Find when opening or closing each room's windows helps reach your target temperature.</p>
 
-It started out as a pile of template sensors and Jinja macros; this
-integration is a 1:1 port of that logic (verified by a differential test
-against the original templates) plus discovery, repairs and a UI.
+The integration combines indoor temperatures, window contacts and an hourly
+weather forecast to recommend an action for each room and the whole home.
 
 ## Features
 
-- **Rooms are discovered from areas**: any area with window contacts
-  (`device_class: window`, window groups are expanded so balcony doors count)
-  and a temperature sensor. Rooms are config subentries, so you can add,
-  reconfigure and remove them from the UI.
-- Per room:
-  - `sensor.when_to_open_<room>_windows` / `sensor.when_to_close_<room>_windows`:
-    `now`, the next forecast hour at which it helps, `All good` or `unknown`.
-    Attributes: `timedelta` (`NOW!`, `2h05`, …), `relative_datetime`,
-    `message`.
-  - `binary_sensor.window_advisor_<room>`: on when something needs doing.
-    Attributes: `advice` (`open`/`close`/`nothing`) and `todo` (the same, but
-    `nothing` once the window already is in that state).
-- Whole home:
-  - `binary_sensor.window_advisor`: majority vote across rooms. Attributes:
-    `advice`, `todo` (e.g. `Open: Bedroom, Living Room`), `todo_next`
-    (`Close in 2h05 (21:52)`), `primary_info`/`secondary_info` for dashboards,
-    `rooms`.
-  - `sensor.open_windows`: number of open windows, with `open_windows` and a
-    human-readable `message`.
-- **Target temperature** and **tolerance** come from your own helpers
-  (`input_number`, `number` or `sensor`) or from built-in number entities.
-- **Repairs**:
-  - *New room discovered*: one click adds it (ignore the issue to never be
-    asked about that area again).
-  - *Missing entities*: a configured sensor was renamed or removed; the fix
-    flow lets you pick a replacement.
-  - *Forecast unavailable*: the weather entity keeps failing. The last good
-    forecast is used meanwhile.
-- Diagnostics, and a `window_advisor.refresh` action to fetch the forecast
-  right away.
+- **Room discovery:** Find areas with window contacts and a temperature sensor, and configure them through UI subentries.
+- **Forecast advice:** Show when opening or closing a window will help a room reach its target. See [Window advice](docs/advice.md).
+- **Whole-home summary:** Combine room recommendations into actionable dashboard text and count open windows.
+- **Repairs:** Offer fixes for new rooms, missing entities or an unavailable forecast.
 
-## Avoiding alert fatigue
+## Install
 
-**Only list rooms that need it** (on by default) changes one thing compared
-to the original templates. The whole-home vote used to list *every* room
-whose window wasn't in the winning state. Since a 0:0 tie resolves to "open",
-a single unavailable room was enough to get "Open: Living Room" while the
-living room was perfectly fine. With the option on, only rooms whose own
-advisor recommends the action are listed. Turn it off for the exact old
-behaviour.
+Use the Marketplace badge above on Home Assistant 2026.11 or later to add this
+repository as a custom integration. On older versions, add it as a HACS
+custom repository of type **Integration**. Install and restart Home Assistant.
+The badge does not imply a public catalog listing. For manual installation,
+copy `custom_components/window_advisor/` into Home Assistant's
+`custom_components/` directory and restart.
 
-The whole-home advice is also computed in one go now. The template read its
-own previous attributes, so state and `todo` briefly disagreed and the
-sensor flapped off/on within a minute. It also stays *unavailable* until the
-first evaluation after a restart instead of reporting on with stale data.
+## Quick start
 
-A room advisor also no longer goes unavailable when one of the two times
-is `unknown` (e.g. the room is too cold and no warmer hour is forecast, so
-opening can't be scheduled). The templates hid the room's "close now" advice
-in that case; now it only goes unavailable when its temperatures or window
-contacts do.
+1. Add **Window Advisor** under **Settings → Devices & services → Add integration**.
+2. Select a weather entity with an hourly forecast, then configure target temperature and tolerance.
+3. Add a discovered room with window contacts and a temperature sensor.
+4. Add `binary_sensor.window_advisor` to a dashboard to see the whole-home recommendation.
 
-## Installation
+## Documentation
 
-Use the badge above to add this repository as a custom integration in Home
-Assistant Marketplace (Home Assistant 2026.11 or later), then install Window
-Advisor. On older versions, add it under **HACS → Integrations → ⋮ → Custom
-repositories** with category **Integration**. Neither route implies a public
-catalog listing.
+| Topic | Description |
+|-------|-------------|
+| [Window advice](docs/advice.md) | Forecast rules, room entities and whole-home behavior |
 
-For a manual install, copy `custom_components/window_advisor` into your
-configuration directory and restart Home Assistant. Then go to **Settings →
-Devices & services → Add integration → Window Advisor**.
+## License
 
-## How the advice works
-
-For each room, with `target ± tolerance`:
-
-| Room is… | and outside is… | when to open | when to close |
-| --- | --- | --- | --- |
-| too hot | cooler | now | first hotter forecast hour |
-| too hot | hotter | first cooler forecast hour | now |
-| too cold | hotter | now | first cooler forecast hour |
-| too cold | cooler | first hotter forecast hour | now |
-| in range | — | All good | All good |
-
-A room advisor says **open** when opening is due now and closing isn't (or
-both are and opening is the more recent call), and likewise for **close**.
+[GPL-3.0](LICENSE).
