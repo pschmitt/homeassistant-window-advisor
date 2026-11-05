@@ -1,5 +1,7 @@
 # Window Advisor — Home Assistant integration
 
+[![Open this integration in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=pschmitt&repository=homeassistant-window-advisor&category=integration)
+
 <img src="custom_components/window_advisor/brand/icon.png" width="96" align="right" alt="Window Advisor icon">
 
 Tells you **when to open or close the windows**, per room and for the whole
@@ -67,9 +69,15 @@ contacts do.
 
 ## Installation
 
-HACS (custom repository) or copy `custom_components/window_advisor` into your
-configuration directory, restart, then **Settings → Devices & services → Add
-integration → Window Advisor**.
+Use the badge above to add this repository as a custom integration in Home
+Assistant Marketplace (Home Assistant 2026.11 or later), then install Window
+Advisor. On older versions, add it under **HACS → Integrations → ⋮ → Custom
+repositories** with category **Integration**. Neither route implies a public
+catalog listing.
+
+For a manual install, copy `custom_components/window_advisor` into your
+configuration directory and restart Home Assistant. Then go to **Settings →
+Devices & services → Add integration → Window Advisor**.
 
 ## How the advice works
 
