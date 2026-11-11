@@ -41,6 +41,10 @@ from homeassistant.util import slugify
 
 from .const import (
     CONF_AREA,
+    CONF_CO2_CLOSE_PPM,
+    CONF_CO2_DELAY,
+    CONF_CO2_ENTITY,
+    CONF_CO2_OPEN_PPM,
     CONF_DISCOVERY_REPAIRS,
     CONF_FORECAST_INTERVAL,
     CONF_IGNORE_IDLE_ROOMS,
@@ -51,6 +55,9 @@ from .const import (
     CONF_TEMPERATURE_ENTITY,
     CONF_WEATHER_ENTITY,
     CONF_WINDOW_ENTITIES,
+    DEFAULT_CO2_CLOSE_PPM,
+    DEFAULT_CO2_DELAY,
+    DEFAULT_CO2_OPEN_PPM,
     DEFAULT_DISCOVERY_REPAIRS,
     DEFAULT_FORECAST_INTERVAL,
     DEFAULT_IGNORE_IDLE_ROOMS,
@@ -108,6 +115,42 @@ def _hub_schema(defaults: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(
+                CONF_CO2_OPEN_PPM,
+                default=defaults.get(CONF_CO2_OPEN_PPM, DEFAULT_CO2_OPEN_PPM),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=400,
+                    max=5000,
+                    step=50,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="ppm",
+                )
+            ),
+            vol.Required(
+                CONF_CO2_CLOSE_PPM,
+                default=defaults.get(CONF_CO2_CLOSE_PPM, DEFAULT_CO2_CLOSE_PPM),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=400,
+                    max=5000,
+                    step=50,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="ppm",
+                )
+            ),
+            vol.Required(
+                CONF_CO2_DELAY,
+                default=defaults.get(CONF_CO2_DELAY, DEFAULT_CO2_DELAY),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=0,
+                    max=3600,
+                    step=30,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="s",
+                )
+            ),
+            vol.Required(
                 CONF_IGNORE_IDLE_ROOMS,
                 default=defaults.get(CONF_IGNORE_IDLE_ROOMS, DEFAULT_IGNORE_IDLE_ROOMS),
             ): BooleanSelector(),
@@ -127,6 +170,11 @@ def _hub_options(user_input: dict[str, Any]) -> dict[str, Any]:
         CONF_TARGET_TEMPERATURE_ENTITY: user_input.get(CONF_TARGET_TEMPERATURE_ENTITY) or "",
         CONF_TARGET_DELTA_ENTITY: user_input.get(CONF_TARGET_DELTA_ENTITY) or "",
         CONF_FORECAST_INTERVAL: int(user_input[CONF_FORECAST_INTERVAL]),
+        CONF_CO2_OPEN_PPM: int(user_input[CONF_CO2_OPEN_PPM]),
+        CONF_CO2_CLOSE_PPM: min(
+            int(user_input[CONF_CO2_CLOSE_PPM]), int(user_input[CONF_CO2_OPEN_PPM])
+        ),
+        CONF_CO2_DELAY: int(user_input[CONF_CO2_DELAY]),
         CONF_IGNORE_IDLE_ROOMS: bool(user_input[CONF_IGNORE_IDLE_ROOMS]),
         CONF_DISCOVERY_REPAIRS: bool(user_input[CONF_DISCOVERY_REPAIRS]),
     }
@@ -148,25 +196,34 @@ def _room_schema(defaults: dict[str, Any]) -> vol.Schema:
                 CONF_TEMPERATURE_ENTITY,
                 description=_suggested(defaults.get(CONF_TEMPERATURE_ENTITY)),
             ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class="temperature")),
+            vol.Optional(
+                CONF_CO2_ENTITY, description=_suggested(defaults.get(CONF_CO2_ENTITY))
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", device_class="carbon_dioxide")),
         }
     )
 
 
 def room_data(
-    area_id: str | None, windows: list[str] | tuple[str, ...], temperature: str
+    area_id: str | None,
+    windows: list[str] | tuple[str, ...],
+    temperature: str,
+    co2: str | None = None,
 ) -> dict[str, Any]:
     """Subentry payload for a room."""
     return {
         CONF_AREA: area_id or "",
         CONF_WINDOW_ENTITIES: list(windows),
         CONF_TEMPERATURE_ENTITY: temperature,
+        CONF_CO2_ENTITY: co2 or "",
     }
 
 
 def room_subentry(room: DiscoveredRoom) -> ConfigSubentryData:
     """Subentry for a discovered room."""
     return ConfigSubentryData(
-        data=room_data(room.area_id, room.window_entities, room.temperature_entity),
+        data=room_data(
+            room.area_id, room.window_entities, room.temperature_entity, room.co2_entity
+        ),
         subentry_type=SUBENTRY_TYPE_ROOM,
         title=room.name,
         unique_id=room.area_id,
@@ -300,6 +357,7 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
                 if room := async_discover_room(self.hass, area_id):
                     self._defaults[CONF_WINDOW_ENTITIES] = list(room.window_entities)
                     self._defaults[CONF_TEMPERATURE_ENTITY] = room.temperature_entity
+                    self._defaults[CONF_CO2_ENTITY] = room.co2_entity
             return await self.async_step_room()
 
         unconfigured = [
@@ -335,6 +393,7 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
                         area_id,
                         user_input[CONF_WINDOW_ENTITIES],
                         user_input[CONF_TEMPERATURE_ENTITY],
+                        user_input.get(CONF_CO2_ENTITY),
                     ),
                     unique_id=area_id,
                 )
@@ -364,6 +423,7 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
                         area_id,
                         user_input[CONF_WINDOW_ENTITIES],
                         user_input[CONF_TEMPERATURE_ENTITY],
+                        user_input.get(CONF_CO2_ENTITY),
                     ),
                     unique_id=area_id,
                 )

@@ -185,3 +185,84 @@ def test_room_advice_with_unknown_open_time() -> None:
     assert (room.advice, room.todo, room.problem) == ("close", "close", True)
     room = advisor.evaluate_room("off", _wt("unknown"), _wt(NOW.isoformat()))
     assert (room.advice, room.todo, room.problem) == ("close", "nothing", False)
+
+
+def _latch(latch, value, minutes):
+    return latch.update(
+        value,
+        NOW + timedelta(minutes=minutes),
+        on=1000,
+        off=600,
+        delay=timedelta(minutes=2),
+    )
+
+
+def test_co2_latch_needs_sustained_high_reading() -> None:
+    latch = advisor.Co2Latch()
+    latch = _latch(latch, 1100, 0)
+    assert latch.pending and not latch.high
+    # A dip below the threshold resets the delay.
+    assert _latch(latch, 950, 1) == advisor.Co2Latch()
+    latch = _latch(advisor.Co2Latch(), 1100, 1)
+    latch = _latch(latch, 1100, 2)
+    assert not latch.high
+    assert _latch(latch, 1050, 3).high
+
+
+def test_room_without_co2_sensor_is_unaffected() -> None:
+    # co2_high defaults to False: rooms without a sensor behave as before.
+    open_to = _wt("2026-10-11T22:00:00+02:00")
+    close_to = _wt("All good")
+    assert advisor.evaluate_room("off", open_to, close_to).co2_high is False
+
+
+def test_co2_latch_holds_until_well_below_threshold() -> None:
+    latch = advisor.Co2Latch(high=True)
+    # 950 a minute later is not enough.
+    assert _latch(latch, 950, 1).high
+    assert _latch(latch, 700, 2).high
+    assert not _latch(latch, 590, 3).high
+
+
+def test_co2_latch_unavailable_resets() -> None:
+    assert _latch(advisor.Co2Latch(high=True), None, 0) == advisor.Co2Latch()
+
+
+def test_co2_beats_temperature() -> None:
+    # Too cold and colder outside: temperature says close, CO2 says open.
+    open_to = advisor.compute_when_to(
+        "open",
+        indoor_temp=17.0,
+        outdoor_temp=9.0,
+        target_temp=21.0,
+        target_delta=1.5,
+        forecast=[],
+        unit="°C",
+        now=NOW,
+    )
+    close_to = advisor.compute_when_to(
+        "close",
+        indoor_temp=17.0,
+        outdoor_temp=9.0,
+        target_temp=21.0,
+        target_delta=1.5,
+        forecast=[],
+        unit="°C",
+        now=NOW,
+    )
+    assert advisor.evaluate_room("off", open_to, close_to).advice == "close"
+    room = advisor.evaluate_room("off", open_to, close_to, co2_high=True)
+    assert (room.advice, room.todo, room.co2_high) == ("open", "open", True)
+    # Already open: nothing left to do.
+    assert advisor.evaluate_room("on", open_to, close_to, co2_high=True).todo == "nothing"
+
+
+def test_aggregate_co2_wins_vote() -> None:
+    rooms = [
+        advisor.RoomStatus("A", "off", "close", "All good", "All good"),
+        advisor.RoomStatus("B", "off", "close", "All good", "All good"),
+        advisor.RoomStatus("C", "off", "open", "All good", "All good", co2_high=True),
+    ]
+    result = advisor.evaluate_aggregate(rooms, NOW, ignore_idle_rooms=True)
+    assert result.advice == "open"
+    assert result.rooms == ("C",)

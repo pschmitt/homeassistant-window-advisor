@@ -26,6 +26,7 @@ from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
 from .const import (
     CONF_AREA,
+    CONF_CO2_ENTITY,
     CONF_DISCOVERY_REPAIRS,
     CONF_OUTDOOR_TEMPERATURE_ENTITY,
     CONF_TARGET_DELTA_ENTITY,
@@ -176,6 +177,7 @@ class RoomDiscoveredRepairFlow(RepairsFlow):
                             CONF_AREA: room.area_id,
                             CONF_WINDOW_ENTITIES: list(room.window_entities),
                             CONF_TEMPERATURE_ENTITY: room.temperature_entity,
+                            CONF_CO2_ENTITY: room.co2_entity or "",
                         }
                     ),
                     subentry_type=SUBENTRY_TYPE_ROOM,

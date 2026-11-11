@@ -16,6 +16,7 @@ weather forecast to recommend an action for each room and the whole home.
 ## Features
 
 - **Room discovery:** Find areas with window contacts and a temperature sensor, and configure them through UI subentries.
+- **CO2:** Advise opening a room whose CO2 stays high, with hysteresis. See [Window advice](docs/advice.md#co2).
 - **Forecast advice:** Show when opening or closing a window will help a room reach its target. See [Window advice](docs/advice.md).
 - **Whole-home summary:** Combine room recommendations into actionable dashboard text and count open windows.
 - **Repairs:** Offer fixes for new rooms, missing entities or an unavailable forecast.

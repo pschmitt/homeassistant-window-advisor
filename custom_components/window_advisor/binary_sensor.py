@@ -17,6 +17,8 @@ from homeassistant.helpers.event import async_track_utc_time_change
 from .advisor import AggregateAdvice, RoomAdvice
 from .const import (
     ATTR_ADVICE,
+    ATTR_CO2,
+    ATTR_CO2_HIGH,
     ATTR_MESSAGE,
     ATTR_PRIMARY_INFO,
     ATTR_ROOMS,
@@ -85,7 +87,11 @@ class RoomAdvisorBinarySensor(WindowAdvisorRoomEntity, BinarySensorEntity):
         advice = self._advice
         if advice is None:
             return {}
-        return {ATTR_ADVICE: advice.advice, ATTR_TODO: advice.todo}
+        attributes: dict[str, Any] = {ATTR_ADVICE: advice.advice, ATTR_TODO: advice.todo}
+        if self.room.co2_entity:
+            attributes[ATTR_CO2] = self.coordinator.co2_value(self.room)
+            attributes[ATTR_CO2_HIGH] = advice.co2_high
+        return attributes
 
 
 class WindowAdvisorBinarySensor(WindowAdvisorEntity, BinarySensorEntity):

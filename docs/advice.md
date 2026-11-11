@@ -20,6 +20,25 @@ A room advisor recommends **open** when opening is due now and closing is not
 `input_number`, `number` and `sensor` entities may provide the target and
 tolerance instead of the integration's built-in number entities.
 
+## CO2
+
+A room can have an optional CO2 sensor (rooms without one are unaffected).
+Stale air beats temperature: while CO2 counts as high, the room is advised to
+**open**, whatever the temperatures say, and the whole-home advice votes to
+open as well.
+
+To avoid jitter, the advice has hysteresis and a delay:
+
+- It starts when CO2 stays above **1000 ppm** for **120 s**. A dip back
+  below the threshold restarts the delay.
+- It only stops when CO2 falls below **600 ppm**. A reading of 950 ppm a
+  minute later does not end it.
+- An unavailable sensor ends it.
+
+All three values are hub options. The room binary sensor exposes `co2` and
+`co2_high` attributes when a CO2 sensor is configured. Discovery pre-fills the
+sensor from the area's `carbon_dioxide` sensors.
+
 ## Entities
 
 Per-room open and close sensors report `now`, the next helpful forecast hour,

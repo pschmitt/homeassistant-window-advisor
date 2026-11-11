@@ -40,6 +40,7 @@ class DiscoveredRoom:
     name: str
     window_entities: tuple[str, ...]
     temperature_entity: str
+    co2_entity: str | None = None
 
     @property
     def label(self) -> str:
@@ -114,6 +115,20 @@ def _temperature_entity(hass: HomeAssistant, area_id: str, entity_ids: list[str]
 
 
 @callback
+def _co2_entity(hass: HomeAssistant, entity_ids: list[str]) -> str | None:
+    """First CO2 sensor (ppm) of an area, if any."""
+    for entity_id in sorted(entity_ids):
+        state = hass.states.get(entity_id)
+        if (
+            state is not None
+            and entity_id.startswith("sensor.")
+            and state.attributes.get(ATTR_DEVICE_CLASS) == SensorDeviceClass.CO2
+        ):
+            return entity_id
+    return None
+
+
+@callback
 def async_discover_rooms(hass: HomeAssistant) -> list[DiscoveredRoom]:
     """Return every area that looks like a room the advisor can handle."""
     area_reg = ar.async_get(hass)
@@ -133,6 +148,7 @@ def async_discover_rooms(hass: HomeAssistant) -> list[DiscoveredRoom]:
                 name=area.name,
                 window_entities=tuple(windows),
                 temperature_entity=temperature,
+                co2_entity=_co2_entity(hass, entity_ids),
             )
         )
     return rooms

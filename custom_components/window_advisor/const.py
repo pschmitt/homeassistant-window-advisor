@@ -19,11 +19,19 @@ CONF_FORECAST_INTERVAL = "forecast_interval"
 # Alert-fatigue fix, see advisor.evaluate_aggregate().
 CONF_IGNORE_IDLE_ROOMS = "ignore_idle_rooms"
 CONF_DISCOVERY_REPAIRS = "discovery_repairs"
+# CO2: open above ``co2_open_ppm`` for ``co2_delay`` seconds, keep advising
+# until it falls below ``co2_close_ppm``.
+CONF_CO2_OPEN_PPM = "co2_open_ppm"
+CONF_CO2_CLOSE_PPM = "co2_close_ppm"
+CONF_CO2_DELAY = "co2_delay"
 
 DEFAULT_FORECAST_INTERVAL = 900  # 15 minutes, same as the old template trigger
 MIN_FORECAST_INTERVAL = 300
 DEFAULT_IGNORE_IDLE_ROOMS = True
 DEFAULT_DISCOVERY_REPAIRS = True
+DEFAULT_CO2_OPEN_PPM = 1000
+DEFAULT_CO2_CLOSE_PPM = 600
+DEFAULT_CO2_DELAY = 120  # seconds above the threshold before advising
 
 # Built-in target number entities (used when no external entity is set).
 DEFAULT_TARGET_TEMPERATURE = 21.0
@@ -41,6 +49,8 @@ SUBENTRY_TYPE_ROOM = "room"
 CONF_AREA = "area"
 CONF_WINDOW_ENTITIES = "window_entities"
 CONF_TEMPERATURE_ENTITY = "temperature_entity"
+# Optional per-room CO2 sensor (ppm).
+CONF_CO2_ENTITY = "co2_entity"
 CONF_ROOMS = "rooms"
 
 # ---------------------------------------------------------------------------
@@ -57,6 +67,8 @@ ATTR_ROOMS = "rooms"
 ATTR_TIMEDELTA = "timedelta"
 ATTR_RELATIVE_DATETIME = "relative_datetime"
 ATTR_OPEN_WINDOWS = "open_windows"
+ATTR_CO2 = "co2"
+ATTR_CO2_HIGH = "co2_high"
 
 # ---------------------------------------------------------------------------
 # Repairs.

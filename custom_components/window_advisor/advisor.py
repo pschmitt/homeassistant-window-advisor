@@ -63,6 +63,8 @@ class RoomAdvice:
     todo: str
     problem: bool
     icon: str
+    # True when the advice is driven by stale air rather than temperature.
+    co2_high: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +77,46 @@ class RoomStatus:
     advice: str | None
     when_to_open: str
     when_to_close: str
+    co2_high: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class Co2Latch:
+    """Debounced "air is stale" flag for one room (hysteresis plus delay).
+
+    Goes high once the reading has stayed above ``on`` for ``delay`` and only
+    goes low again when it drops below ``off``. A reading hovering around the
+    ``on`` threshold therefore neither triggers nor clears the advice.
+    """
+
+    high: bool = False
+    above_since: datetime | None = None
+
+    @property
+    def pending(self) -> bool:
+        """Above the threshold, waiting for the delay to elapse."""
+        return not self.high and self.above_since is not None
+
+    def update(
+        self,
+        value: float | None,
+        now: datetime,
+        *,
+        on: float,
+        off: float,
+        delay: timedelta,
+    ) -> Co2Latch:
+        """Return the new latch for a reading (None = sensor unavailable)."""
+        if value is None:
+            return Co2Latch()
+        if self.high:
+            return Co2Latch() if value < off else self
+        if value <= on:
+            return Co2Latch()
+        since = self.above_since or now
+        if now - since >= delay:
+            return Co2Latch(high=True)
+        return Co2Latch(above_since=since)
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,8 +296,19 @@ def compute_when_to(
     )
 
 
-def room_advice(window_state: str, open_to: WhenTo, close_to: WhenTo) -> str:
-    """Decide whether a room's windows should be opened or closed right now."""
+def room_advice(
+    window_state: str,
+    open_to: WhenTo,
+    close_to: WhenTo,
+    co2_high: bool = False,
+) -> str:
+    """Decide whether a room's windows should be opened or closed right now.
+
+    Stale air (``co2_high``) beats temperature: the room is advised to open
+    no matter what the temperatures say.
+    """
+    if co2_high:
+        return ACTION_OPEN
     open_now = open_to.timedelta == NOW
     close_now = close_to.timedelta == NOW
     open_at = parse_datetime(open_to.state)
@@ -299,15 +352,21 @@ def room_icon(window_state: str, todo: str | None) -> str:
     return "mdi:thumb-up"
 
 
-def evaluate_room(window_state: str, open_to: WhenTo, close_to: WhenTo) -> RoomAdvice:
+def evaluate_room(
+    window_state: str,
+    open_to: WhenTo,
+    close_to: WhenTo,
+    co2_high: bool = False,
+) -> RoomAdvice:
     """Full per-room evaluation."""
-    advice = room_advice(window_state, open_to, close_to)
+    advice = room_advice(window_state, open_to, close_to, co2_high)
     todo = room_todo(window_state, advice)
     return RoomAdvice(
         advice=advice,
         todo=todo,
         problem=todo in (ACTION_OPEN, ACTION_CLOSE),
         icon=room_icon(window_state, todo),
+        co2_high=co2_high,
     )
 
 
@@ -338,7 +397,10 @@ def evaluate_aggregate(
     advices = [room.advice for room in rooms]
     open_ct = advices.count(ACTION_OPEN)
     close_ct = advices.count(ACTION_CLOSE)
-    if open_ct >= 2:
+    if any(room.co2_high for room in rooms):
+        # Stale air beats temperature, also in the whole-home vote.
+        target = ACTION_OPEN
+    elif open_ct >= 2:
         target = ACTION_OPEN
     elif close_ct >= 2:
         target = ACTION_CLOSE

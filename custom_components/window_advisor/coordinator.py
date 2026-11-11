@@ -25,8 +25,8 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
-from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
@@ -37,6 +37,7 @@ from .advisor import (
     STATE_OFF,
     STATE_ON,
     AggregateAdvice,
+    Co2Latch,
     ForecastPoint,
     RoomAdvice,
     RoomStatus,
@@ -47,6 +48,10 @@ from .advisor import (
 )
 from .const import (
     CONF_AREA,
+    CONF_CO2_CLOSE_PPM,
+    CONF_CO2_DELAY,
+    CONF_CO2_ENTITY,
+    CONF_CO2_OPEN_PPM,
     CONF_FORECAST_INTERVAL,
     CONF_IGNORE_IDLE_ROOMS,
     CONF_OUTDOOR_TEMPERATURE_ENTITY,
@@ -55,6 +60,9 @@ from .const import (
     CONF_TEMPERATURE_ENTITY,
     CONF_WEATHER_ENTITY,
     CONF_WINDOW_ENTITIES,
+    DEFAULT_CO2_CLOSE_PPM,
+    DEFAULT_CO2_DELAY,
+    DEFAULT_CO2_OPEN_PPM,
     DEFAULT_FORECAST_INTERVAL,
     DEFAULT_IGNORE_IDLE_ROOMS,
     DEFAULT_TARGET_DELTA,
@@ -79,6 +87,7 @@ class Room:
     area_id: str | None
     window_entities: tuple[str, ...]
     temperature_entity: str
+    co2_entity: str | None = None
 
     @classmethod
     def from_subentry(cls, subentry: ConfigSubentry) -> Room:
@@ -91,6 +100,7 @@ class Room:
             area_id=data.get(CONF_AREA) or None,
             window_entities=tuple(data.get(CONF_WINDOW_ENTITIES, ())),
             temperature_entity=data[CONF_TEMPERATURE_ENTITY],
+            co2_entity=data.get(CONF_CO2_ENTITY) or None,
         )
 
 
@@ -135,6 +145,8 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
             if subentry.subentry_type == SUBENTRY_TYPE_ROOM
         }
         self.hub_device_id: str | None = None
+        self._co2_latches: dict[str, Co2Latch] = {}
+        self._co2_timers: dict[str, CALLBACK_TYPE] = {}
         self.forecast_failures = 0
         self.last_forecast_error: str | None = None
         # Built-in target numbers register their current value here.
@@ -165,6 +177,21 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
         """Whether idle rooms are left out of the whole-home advice."""
         return bool(self.option(CONF_IGNORE_IDLE_ROOMS, DEFAULT_IGNORE_IDLE_ROOMS))
 
+    @property
+    def co2_open_ppm(self) -> float:
+        """CO2 level above which windows should be opened."""
+        return float(self.option(CONF_CO2_OPEN_PPM, DEFAULT_CO2_OPEN_PPM))
+
+    @property
+    def co2_close_ppm(self) -> float:
+        """CO2 level below which the stale-air advice is dropped again."""
+        return float(self.option(CONF_CO2_CLOSE_PPM, DEFAULT_CO2_CLOSE_PPM))
+
+    @property
+    def co2_delay(self) -> timedelta:
+        """How long CO2 must stay above the threshold before advising."""
+        return timedelta(seconds=float(self.option(CONF_CO2_DELAY, DEFAULT_CO2_DELAY)))
+
     def external_target(self, key: str) -> str | None:
         """External target/delta entity, or None to use the built-in number."""
         return self.option(key) or None  # type: ignore[return-value]
@@ -183,6 +210,8 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
         result = {"hub": hub}
         for room in self.rooms.values():
             result[room.subentry_id] = [*room.window_entities, room.temperature_entity]
+            if room.co2_entity:
+                result[room.subentry_id].append(room.co2_entity)
         return result
 
     # ------------------------------------------------------------------
@@ -202,6 +231,48 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
         if entity_id := self.external_target(key):
             return self._float_state(entity_id)
         return self.builtin_targets[key]
+
+    def co2_value(self, room: Room) -> float | None:
+        """Current CO2 reading (ppm) of a room, None without a usable sensor."""
+        return self._float_state(room.co2_entity) if room.co2_entity else None
+
+    def co2_high(self, room: Room) -> bool:
+        """Whether the room's air counts as stale (debounced, see Co2Latch)."""
+        latch = self._co2_latches.get(room.subentry_id)
+        return latch.high if latch else False
+
+    @callback
+    def _update_co2(self, room: Room) -> None:
+        """Feed the current reading into the room's latch."""
+        latch = self._co2_latches.get(room.subentry_id, Co2Latch())
+        new = latch.update(
+            self.co2_value(room),
+            dt_util.utcnow(),
+            on=self.co2_open_ppm,
+            off=self.co2_close_ppm,
+            delay=self.co2_delay,
+        )
+        self._co2_latches[room.subentry_id] = new
+        if cancel := self._co2_timers.pop(room.subentry_id, None):
+            cancel()
+        if new.pending and new.above_since is not None:
+            remaining = self.co2_delay - (dt_util.utcnow() - new.above_since)
+
+            @callback
+            def _recheck(_now: datetime) -> None:
+                self._co2_timers.pop(room.subentry_id, None)
+                self._update_co2(room)
+                self.async_update_listeners()
+
+            self._co2_timers[room.subentry_id] = async_call_later(
+                self.hass, max(remaining.total_seconds(), 0) + 1, _recheck
+            )
+
+    @callback
+    def _cancel_co2_timers(self) -> None:
+        for cancel in self._co2_timers.values():
+            cancel()
+        self._co2_timers.clear()
 
     def window_state(self, room: Room) -> str:
         """Combined window state of a room (like a binary_sensor group)."""
@@ -251,9 +322,18 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
         # A when-to of "unknown" (no useful forecast hour) is a valid answer,
         # not missing data: the template made the whole room unavailable then,
         # which hid e.g. "close now" whenever opening couldn't be scheduled.
-        if when is None or window in INVALID:
+        if window in INVALID:
             return None
-        return evaluate_room(window, when.open, when.close)
+        co2_high = self.co2_high(room)
+        if when is None:
+            # Temperatures missing: stale air alone can still advise.
+            if not co2_high:
+                return None
+            unknown = WhenTo(
+                state="unknown", timedelta="N/A", relative_datetime="N/A", message="N/A"
+            )
+            return evaluate_room(window, unknown, unknown, co2_high)
+        return evaluate_room(window, when.open, when.close, co2_high)
 
     def aggregate(self) -> AggregateAdvice | None:
         """Whole-home advice, None until the first evaluation."""
@@ -270,6 +350,7 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
                     advice=advice.advice if advice else None,
                     when_to_open=when.open.state if when else STATE_UNAVAILABLE,
                     when_to_close=when.close.state if when else STATE_UNAVAILABLE,
+                    co2_high=self.co2_high(room),
                 )
             )
         return evaluate_aggregate(statuses, dt_util.now(), ignore_idle_rooms=self.ignore_idle_rooms)
@@ -382,6 +463,22 @@ class WindowAdvisorCoordinator(DataUpdateCoordinator[Snapshot]):
         self.config_entry.async_on_unload(
             async_track_state_change_event(self.hass, windows, _on_window)
         )
+
+        co2_rooms = {room.co2_entity: room for room in self.rooms.values() if room.co2_entity}
+
+        @callback
+        def _on_co2(event: Event) -> None:
+            room = co2_rooms[event.data["entity_id"]]
+            self._update_co2(room)
+            self.async_update_listeners()
+
+        if co2_rooms:
+            for room in co2_rooms.values():
+                self._update_co2(room)
+            self.config_entry.async_on_unload(
+                async_track_state_change_event(self.hass, list(co2_rooms), _on_co2)
+            )
+            self.config_entry.async_on_unload(self._cancel_co2_timers)
 
         @callback
         def _on_weather(event: Event) -> None:

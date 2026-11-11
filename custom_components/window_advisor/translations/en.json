@@ -12,7 +12,10 @@
           "target_delta_entity": "Target temperature tolerance (optional)",
           "forecast_interval": "Forecast update interval",
           "ignore_idle_rooms": "Only list rooms that need it",
-          "discovery_repairs": "Suggest newly discovered rooms"
+          "discovery_repairs": "Suggest newly discovered rooms",
+          "co2_open_ppm": "CO2: open above",
+          "co2_close_ppm": "CO2: stop advising below",
+          "co2_delay": "CO2: delay before advising"
         },
         "data_description": {
           "weather_entity": "Must provide an hourly forecast. It's used to tell when opening or closing will help next.",
@@ -21,7 +24,10 @@
           "target_delta_entity": "How far the indoor temperature may drift from the target before advice kicks in. Leave empty for a built-in number entity.",
           "forecast_interval": "How often the hourly forecast is fetched (seconds). Temperature changes are evaluated immediately regardless.",
           "ignore_idle_rooms": "Alert-fatigue fix. When on, the whole-home advice only lists rooms whose own advisor recommends the action. When off, it behaves like the original templates and lists every room whose window isn't in the majority's state, even rooms that are fine.",
-          "discovery_repairs": "Raise a repair issue when an area gains window contacts and a temperature sensor but has no room yet."
+          "discovery_repairs": "Raise a repair issue when an area gains window contacts and a temperature sensor but has no room yet.",
+          "co2_open_ppm": "Rooms with a CO2 sensor are advised to open their windows above this level (ppm). CO2 beats temperature.",
+          "co2_close_ppm": "Once advising, keep doing so until CO2 falls below this level (ppm). Keeps the advice from flapping around the threshold.",
+          "co2_delay": "CO2 must stay above the threshold this long (seconds) before the advice starts, so short spikes are ignored."
         }
       },
       "rooms": {
@@ -48,7 +54,10 @@
           "target_delta_entity": "Target temperature tolerance (optional)",
           "forecast_interval": "Forecast update interval",
           "ignore_idle_rooms": "Only list rooms that need it",
-          "discovery_repairs": "Suggest newly discovered rooms"
+          "discovery_repairs": "Suggest newly discovered rooms",
+          "co2_open_ppm": "CO2: open above",
+          "co2_close_ppm": "CO2: stop advising below",
+          "co2_delay": "CO2: delay before advising"
         },
         "data_description": {
           "weather_entity": "Must provide an hourly forecast. It's used to tell when opening or closing will help next.",
@@ -57,7 +66,10 @@
           "target_delta_entity": "How far the indoor temperature may drift from the target before advice kicks in. Leave empty for a built-in number entity.",
           "forecast_interval": "How often the hourly forecast is fetched (seconds). Temperature changes are evaluated immediately regardless.",
           "ignore_idle_rooms": "Alert-fatigue fix. When on, the whole-home advice only lists rooms whose own advisor recommends the action. When off, it behaves like the original templates and lists every room whose window isn't in the majority's state, even rooms that are fine.",
-          "discovery_repairs": "Raise a repair issue when an area gains window contacts and a temperature sensor but has no room yet."
+          "discovery_repairs": "Raise a repair issue when an area gains window contacts and a temperature sensor but has no room yet.",
+          "co2_open_ppm": "Rooms with a CO2 sensor are advised to open their windows above this level (ppm). CO2 beats temperature.",
+          "co2_close_ppm": "Once advising, keep doing so until CO2 falls below this level (ppm). Keeps the advice from flapping around the threshold.",
+          "co2_delay": "CO2 must stay above the threshold this long (seconds) before the advice starts, so short spikes are ignored."
         }
       }
     }
@@ -82,13 +94,15 @@
             "name": "Name",
             "area": "Area",
             "window_entities": "Window contacts",
-            "temperature_entity": "Indoor temperature sensor"
+            "temperature_entity": "Indoor temperature sensor",
+            "co2_entity": "CO2 sensor (optional)"
           },
           "data_description": {
             "name": "Also determines the entity ids, e.g. binary_sensor.window_advisor_living_room.",
             "area": "The room device is placed in this area.",
             "window_entities": "Binary sensors that are on while a window or balcony door is open. The room counts as open when any of them is.",
-            "temperature_entity": "Prefer a smoothed/aggregated sensor (median, filtered)."
+            "temperature_entity": "Prefer a smoothed/aggregated sensor (median, filtered).",
+            "co2_entity": "Windows are advised to open when the CO2 level stays high, regardless of temperature."
           }
         },
         "reconfigure": {
@@ -97,13 +111,15 @@
             "name": "Name",
             "area": "Area",
             "window_entities": "Window contacts",
-            "temperature_entity": "Indoor temperature sensor"
+            "temperature_entity": "Indoor temperature sensor",
+            "co2_entity": "CO2 sensor (optional)"
           },
           "data_description": {
             "name": "Also determines the entity ids, e.g. binary_sensor.window_advisor_living_room.",
             "area": "The room device is placed in this area.",
             "window_entities": "Binary sensors that are on while a window or balcony door is open. The room counts as open when any of them is.",
-            "temperature_entity": "Prefer a smoothed/aggregated sensor (median, filtered)."
+            "temperature_entity": "Prefer a smoothed/aggregated sensor (median, filtered).",
+            "co2_entity": "Windows are advised to open when the CO2 level stays high, regardless of temperature."
           }
         }
       },
