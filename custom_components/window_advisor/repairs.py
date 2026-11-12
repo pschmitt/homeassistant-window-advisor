@@ -1,9 +1,9 @@
 """Repair issues for the Window Advisor.
 
-* **Room discovered** (fixable): an area gained window contacts and a
-  temperature sensor but has no room yet. The fix flow adds the room in one
-  click; ignore the issue to never be asked about that area again. Can be
-  turned off in the options.
+* **Room discovered**: an area gained window contacts and a temperature
+  sensor but has no room yet. This is offered as a discovered device (not a
+  repair issue): confirm to add the room, ignore to never be asked about that
+  area again. Can be turned off in the options. See ``_sync_discovery_flows``.
 * **Missing entities** (fixable): a configured entity no longer exists
   (renamed or removed). The fix flow lets you pick replacements.
 * **Forecast unavailable**: the weather entity keeps failing to provide an
@@ -12,12 +12,11 @@
 
 from __future__ import annotations
 
-from types import MappingProxyType
 from typing import Any
 
 import voluptuous as vol
 from homeassistant.components.repairs import RepairsFlow
-from homeassistant.config_entries import ConfigEntry, ConfigSubentry
+from homeassistant.config_entries import SOURCE_INTEGRATION_DISCOVERY, ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import entity_registry as er
@@ -26,7 +25,6 @@ from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 
 from .const import (
     CONF_AREA,
-    CONF_CO2_ENTITY,
     CONF_DISCOVERY_REPAIRS,
     CONF_OUTDOOR_TEMPERATURE_ENTITY,
     CONF_TARGET_DELTA_ENTITY,
@@ -35,17 +33,16 @@ from .const import (
     CONF_WEATHER_ENTITY,
     CONF_WINDOW_ENTITIES,
     DEFAULT_DISCOVERY_REPAIRS,
+    DISCOVERY_UNIQUE_ID_PREFIX,
     DOMAIN,
     FORECAST_FAILURES_BEFORE_ISSUE,
     HUB_ISSUE_KEY,
     ISSUE_FORECAST_UNAVAILABLE,
     ISSUE_MISSING_ENTITIES,
     ISSUE_ROOM_DISCOVERED,
-    SUBENTRY_TYPE_ROOM,
-    URL_INTEGRATION_PAGE,
 )
 from .coordinator import WindowAdvisorCoordinator
-from .discovery import async_discover_room, async_discover_rooms
+from .discovery import async_discover_rooms
 
 _TARGET_DOMAINS = ["input_number", "number", "sensor"]
 
@@ -102,7 +99,6 @@ def async_sync_issues(
     async_sync_forecast_issue(hass, coordinator)
 
     missing: dict[str, dict[str, Any]] = {}
-    discovered: dict[str, dict[str, Any]] = {}
     if coordinator is not None:
         ent_reg = er.async_get(hass)
         for owner, entity_ids in coordinator.configured_entities().items():
@@ -125,76 +121,51 @@ def async_sync_issues(
                 "data": {"entry_id": entry.entry_id, "owner": owner},
             }
 
-        if entry.options.get(CONF_DISCOVERY_REPAIRS, DEFAULT_DISCOVERY_REPAIRS):
-            configured = {room.area_id for room in coordinator.rooms.values()}
-            for room in async_discover_rooms(hass):
-                if room.area_id in configured:
-                    continue
-                discovered[f"{ISSUE_ROOM_DISCOVERED}{room.area_id}"] = {
-                    "is_fixable": True,
-                    "is_persistent": False,
-                    "severity": ir.IssueSeverity.WARNING,
-                    "translation_key": "room_discovered",
-                    "translation_placeholders": {
-                        "name": room.name,
-                        "windows": ", ".join(
-                            f"`{entity_id}`" for entity_id in room.window_entities
-                        ),
-                        "temperature": f"`{room.temperature_entity}`",
-                        "integration_link": URL_INTEGRATION_PAGE,
-                    },
-                    "data": {"entry_id": entry.entry_id, "area_id": room.area_id},
-                }
-
     _sync(hass, ISSUE_MISSING_ENTITIES, missing)
-    _sync(hass, ISSUE_ROOM_DISCOVERED, discovered)
+    # Rooms used to be suggested as repair issues; they are discovered devices now.
+    _sync(hass, ISSUE_ROOM_DISCOVERED, {})
+    _sync_discovery_flows(hass, entry, coordinator)
 
 
-class RoomDiscoveredRepairFlow(RepairsFlow):
-    """Add a discovered room."""
+@callback
+def _sync_discovery_flows(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    coordinator: WindowAdvisorCoordinator | None,
+) -> None:
+    """Offer rooms without a Window Advisor room as discovered devices."""
+    wanted: dict[str, str] = {}
+    if coordinator is not None and entry.options.get(
+        CONF_DISCOVERY_REPAIRS, DEFAULT_DISCOVERY_REPAIRS
+    ):
+        configured = {room.area_id for room in coordinator.rooms.values()}
+        wanted = {
+            f"{DISCOVERY_UNIQUE_ID_PREFIX}{room.area_id}": room.area_id
+            for room in async_discover_rooms(hass)
+            if room.area_id not in configured
+        }
 
-    def __init__(self, data: dict[str, Any]) -> None:
-        """Store the issue data."""
-        self._data = data
+    running: set[str] = set()
+    for flow in hass.config_entries.flow.async_progress_by_handler(DOMAIN):
+        if flow["context"].get("source") != SOURCE_INTEGRATION_DISCOVERY:
+            continue
+        unique_id = flow["context"].get("unique_id")
+        if unique_id in wanted:
+            running.add(unique_id)
+        else:
+            hass.config_entries.flow.async_abort(flow["flow_id"])
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Entry point."""
-        return await self.async_step_confirm()
-
-    async def async_step_confirm(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Confirm and create the room."""
-        entry = _entry(self.hass, self._data["entry_id"])
-        room = async_discover_room(self.hass, self._data["area_id"])
-        if entry is None or room is None:
-            return self.async_abort(reason="room_gone")
-
-        if user_input is not None:
-            self.hass.config_entries.async_add_subentry(
-                entry,
-                ConfigSubentry(
-                    data=MappingProxyType(
-                        {
-                            CONF_AREA: room.area_id,
-                            CONF_WINDOW_ENTITIES: list(room.window_entities),
-                            CONF_TEMPERATURE_ENTITY: room.temperature_entity,
-                            CONF_CO2_ENTITY: room.co2_entity or "",
-                        }
-                    ),
-                    subentry_type=SUBENTRY_TYPE_ROOM,
-                    title=room.name,
-                    unique_id=room.area_id,
-                ),
-            )
-            return self.async_create_entry(data={})
-
-        return self.async_show_form(
-            step_id="confirm",
-            data_schema=vol.Schema({}),
-            description_placeholders={
-                "name": room.name,
-                "windows": ", ".join(f"`{e}`" for e in room.window_entities),
-                "temperature": f"`{room.temperature_entity}`",
-            },
+    for unique_id, area_id in wanted.items():
+        if unique_id in running:
+            continue
+        entry.async_create_background_task(
+            hass,
+            hass.config_entries.flow.async_init(
+                DOMAIN,
+                context={"source": SOURCE_INTEGRATION_DISCOVERY},
+                data={CONF_AREA: area_id},
+            ),
+            f"{DOMAIN}_discover_{area_id}",
         )
 
 
@@ -305,6 +276,4 @@ async def async_create_fix_flow(
 ) -> RepairsFlow:
     """Create the fix flow for an issue."""
     del hass
-    if issue_id.startswith(ISSUE_ROOM_DISCOVERED):
-        return RoomDiscoveredRepairFlow(data or {})
     return MissingEntitiesRepairFlow(data or {})

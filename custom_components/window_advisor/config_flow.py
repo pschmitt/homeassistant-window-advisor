@@ -3,8 +3,9 @@
 The main entry is the shared "hub" (weather, outdoor temperature, targets).
 Each room is a config subentry. Rooms are discovered from areas: the initial
 setup offers every discovered room, and adding a room later pre-fills the
-form from the chosen area. Rooms that appear after setup are offered through
-a repair issue (see repairs.py).
+form from the chosen area. Rooms that appear after setup are offered as
+discovered devices (``integration_discovery`` flows, see repairs.py); ignoring
+one keeps that area from being suggested again.
 """
 
 from __future__ import annotations
@@ -13,9 +14,11 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
+    SOURCE_IGNORE,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
+    ConfigSubentry,
     ConfigSubentryData,
     ConfigSubentryFlow,
     OptionsFlow,
@@ -61,6 +64,7 @@ from .const import (
     DEFAULT_DISCOVERY_REPAIRS,
     DEFAULT_FORECAST_INTERVAL,
     DEFAULT_IGNORE_IDLE_ROOMS,
+    DISCOVERY_UNIQUE_ID_PREFIX,
     DOMAIN,
     MIN_FORECAST_INTERVAL,
     SUBENTRY_TYPE_ROOM,
@@ -260,6 +264,8 @@ class WindowAdvisorConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialize the flow."""
         self._options: dict[str, Any] = {}
         self._discovered: list[DiscoveredRoom] = []
+        self._entry_id: str | None = None
+        self._room: DiscoveredRoom | None = None
 
     @staticmethod
     @callback
@@ -289,6 +295,56 @@ class WindowAdvisorConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user", data_schema=_hub_schema(_hub_defaults(self.hass))
+        )
+
+    async def async_step_integration_discovery(
+        self, discovery_info: dict[str, Any]
+    ) -> ConfigFlowResult:
+        """A room appeared (area gained window contacts and a temperature sensor)."""
+        area_id = discovery_info[CONF_AREA]
+        await self.async_set_unique_id(f"{DISCOVERY_UNIQUE_ID_PREFIX}{area_id}")
+        self._abort_if_unique_id_configured()
+
+        entry = next(
+            (
+                entry
+                for entry in self.hass.config_entries.async_entries(DOMAIN)
+                if entry.source != SOURCE_IGNORE
+            ),
+            None,
+        )
+        room = async_discover_room(self.hass, area_id)
+        if entry is None or room is None or area_id in configured_areas(entry):
+            return self.async_abort(reason="room_gone")
+
+        self._entry_id = entry.entry_id
+        self._room = room
+        self.context["title_placeholders"] = {"name": room.name}
+        return await self.async_step_confirm()
+
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Add the discovered room."""
+        room = self._room
+        entry = self.hass.config_entries.async_get_entry(self._entry_id or "")
+        if room is None or entry is None:
+            return self.async_abort(reason="room_gone")
+
+        if user_input is not None:
+            self.hass.config_entries.async_add_subentry(
+                entry, ConfigSubentry(**room_subentry(room))
+            )
+            return self.async_abort(reason="room_added")
+
+        self._set_confirm_only()
+        return self.async_show_form(
+            step_id="confirm",
+            description_placeholders={
+                "name": room.name,
+                "windows": ", ".join(f"`{e}`" for e in room.window_entities),
+                "temperature": f"`{room.temperature_entity}`",
+            },
         )
 
     async def async_step_rooms(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:

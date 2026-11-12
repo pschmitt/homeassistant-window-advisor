@@ -18,6 +18,5 @@
   "loggers": [
     "custom_components.window_advisor"
   ],
-  "single_config_entry": true,
   "version": "0.1.0"
 }

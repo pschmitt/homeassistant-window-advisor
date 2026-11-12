@@ -73,7 +73,8 @@ ATTR_CO2_HIGH = "co2_high"
 # ---------------------------------------------------------------------------
 # Repairs.
 # ---------------------------------------------------------------------------
-ISSUE_ROOM_DISCOVERED = "room_discovered_"
+ISSUE_ROOM_DISCOVERED = "room_discovered_"  # legacy repair issues, only cleaned up
+DISCOVERY_UNIQUE_ID_PREFIX = "room_"
 ISSUE_MISSING_ENTITIES = "missing_entities_"
 ISSUE_FORECAST_UNAVAILABLE = "forecast_unavailable"
 HUB_ISSUE_KEY = "hub"
